@@ -33,7 +33,7 @@ $ docker run -d -p "3000:3000" -v "$PWD:/usr/src/app/" -v "/usr/src/app/node_mod
 
 To keep the node version aligned between contributor we use [volta](https://volta.sh/) as javascript tool manager
 
-#### Install [volta](https://volta.sh/), go inside the project folder and run
+#### Install [volta](https://volta.sh/), (curl https://get.volta.sh | bash) go inside the project folder and run
 
 ```bash
 $ volta install node

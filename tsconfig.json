@@ -3,7 +3,7 @@
   "exclude": ["**/__mocks__", "iac/*"],
   "compilerOptions": {
     "lib": ["es2020"],
-    "module": "commonjs",
+    "module": "nodenext",
     "target": "es2020",
     "strict": true,
     "esModuleInterop": true,

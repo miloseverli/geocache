@@ -1,0 +1,122 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Express Application/API powered by API Gateway and Lambda
+Parameters:
+  BRANCH:
+    Default: develop
+    Type: String
+  VPC:
+    Description: The VPC for Lambda function and ElastiCache.
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Description: The Subnets for Lambda function and ElastiCache.
+    Type: List<AWS::EC2::Subnet::Id>
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ec2
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                Resource: '*'
+      Path: '/'
+
+  GeoFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ElasticacheCluster
+    Properties:
+      CodeUri: ./
+      Handler: build/lambda.handler
+      MemorySize: 512
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs20.x
+      Timeout: 30
+      Environment:
+        Variables:
+          REDIS_URL:
+            !Join [
+              '',
+              [
+                !GetAtt ElasticacheCluster.ConfigurationEndpoint.Address,
+                ':',
+                !GetAtt ElasticacheCluster.ConfigurationEndpoint.Port,
+              ],
+            ]
+      VpcConfig:
+        SecurityGroupIds:
+          - Ref: LambdaSecurityGroup
+        SubnetIds:
+          Ref: Subnets
+
+  GeoFunctionURL:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !Ref StorefrontApiFunction
+
+  GeoFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GeoFunctionURL
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  ElastiCacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: LambdaSecurityGroup
+    Properties:
+      GroupDescription: Elasticache Security Group
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '11211'
+          ToPort: '11211'
+          SourceSecurityGroupId:
+            Ref: LambdaSecurityGroup
+
+  ElastiCacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: ElastiCache Subnet Group
+      SubnetIds:
+        Ref: Subnets
+
+  ElasticacheCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      Engine: redis
+      CacheNodeType: cache.t2.micro
+      NumCacheNodes: '1'
+      VpcSecurityGroupIds:
+        - Fn::GetAtt:
+            - ElastiCacheSecurityGroup
+            - GroupId
+      CacheSubnetGroupName:
+        Ref: ElastiCacheSubnetGroup
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Lambda Security Group
+      VpcId:
+        Ref: VPC

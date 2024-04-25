@@ -4,6 +4,7 @@ import fp from 'fastify-plugin';
 import { IncomingMessage, Server, ServerResponse } from 'http';
 import secrets from './plugins/secrets';
 import health from './routes/health';
+import geo from './routes/geo';
 
 export default async (
   fastify: FastifyInstance<Server, IncomingMessage, ServerResponse>,
@@ -17,15 +18,17 @@ export default async (
 
   fastify.log.info('Registering health endpoint');
   await fastify.register(health);
+  fastify.log.info('Registering geo endpoint');
+  await fastify.register(geo);
 
   fastify.log.info('Registering helmet endpoint');
   await fastify.register(fastifyHelmet);
 
-  fastify.log.info('Registering secrets manager pluging');
-  await fastify.register(fp(secrets));
+  // fastify.log.info('Registering secrets manager pluging');
+  // await fastify.register(fp(secrets));
   fastify.log.info('Retrieving environment variables from secret manager');
   fastify.log.info(fastify.hasDecorator('secrets') ? 'true' : 'false');
-  fastify.secrets.loadSecrets();
+  // fastify.secrets.loadSecrets();
 
   next();
 };
